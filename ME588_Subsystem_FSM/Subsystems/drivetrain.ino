@@ -13,8 +13,8 @@
 Adafruit_BNO08x  bno08x(BNO08X_RESET);
 sh2_SensorValue_t sensorValue;
 
-ArduPID myControllerL;
-ArduPID myControllerR;
+ArduPID ControllerL;
+ArduPID ControllerR;
 double setpoint_L = 0;
 double setpoint_R = 0;
 double p = 10;
@@ -25,8 +25,18 @@ double motor_L_O=0;
 double motor_R_I=0;
 double motor_R_O=0;
 
-Encoder myEnc_L(3, 4);
-Encoder myEnc_R(5, 6);
+Encoder Enc_L(3, 4);
+Encoder Enc_R(5, 6);
+
+//delivering global variables
+#include <Servo.h>
+Servo servo_1;
+Servo servo_2;
+Servo servo_3;
+int servo_1_pin = 10;
+int servo_2_pin = 11;
+int servo_3_pin = 12;
+
 /*
 double siny;
 double cosy;  
@@ -39,17 +49,22 @@ void setup() {
   bno08x.begin_I2C();
   bno08x.enableReport(SH2_GAME_ROTATION_VECTOR);
 
-  myControllerL.begin(&motor_L_I, &motor_L_O, &setpoint_L, p, i, d);
-  myControllerL.setOutputLimits(0, 255);
-  myControllerL.setBias(255.0 / 2.0);
-  myControllerL.setWindUpLimits(-10, 10); 
-  myControllerL.start();
+  ControllerL.begin(&motor_L_I, &motor_L_O, &setpoint_L, p, i, d);
+  ControllerL.setOutputLimits(0, 255);
+  ControllerL.setBias(255.0 / 2.0);
+  ControllerL.setWindUpLimits(-10, 10); 
+  ControllerL.start();
   
-  myControllerR.begin(&motor_R_I, &motor_R_O, &setpoint_R, p, i, d);
-  myControllerR.setOutputLimits(0, 255);
-  myControllerR.setBias(0);
-  myControllerR.setWindUpLimits(-10, 10); 
-  myControllerR.start();
+  ControllerR.begin(&motor_R_I, &motor_R_O, &setpoint_R, p, i, d);
+  ControllerR.setOutputLimits(0, 255);
+  ControllerR.setBias(0);
+  ControllerR.setWindUpLimits(-10, 10); 
+  ControllerR.start();
+
+  //delivering setup
+  servo_1.attach(servo_1_pin);
+  servo_2.attach(servo_2_pin);
+  servo_3.attach(servo_3_pin);
 }
 
 void loop() {
@@ -100,10 +115,10 @@ void drivingforward(double yawv, double ulr){
       setpoint_R = 21;
     }
   }
-  motor_L_I = speedMeasure(myEnc_L)*10.0;
-  motor_R_I = speedMeasure(myEnc_R)*10.0;
-  myControllerL.compute();
-  myControllerR.compute();
+  motor_L_I = speedMeasure(Enc_L)*10.0;
+  motor_R_I = speedMeasure(Enc_R)*10.0;
+  ControllerL.compute();
+  ControllerR.compute();
   return;
 }
 void turningleft(){
@@ -113,18 +128,36 @@ void turningleft(){
   while(abs(abs(yawv)-abs(init_yawv))<90){
     setpoint_L = 7;
     setpoint_R = 21;
-    motor_L_I = speedMeasure(myEnc_L)*10.0;
-    motor_R_I = speedMeasure(myEnc_R)*10.0;
-    myControllerL.compute();
-    myControllerR.compute();
+    motor_L_I = speedMeasure(Enc_L)*10.0;
+    motor_R_I = speedMeasure(Enc_R)*10.0;
+    ControllerL.compute();
+    ControllerR.compute();
     yawv = getyaw();
   }
   
 }
-long speedMeasure(Encoder &myEnc){//perhaps another board ?
-  long oldPosition = myEnc.read();
+long speedMeasure(Encoder &Enc){//perhaps another board ?
+  long oldPosition = Enc.read();
   delay(100); //need adjustment
-  long newPosition = myEnc.read();
+  long newPosition = Enc.read();
   long speedE = newPosition - oldPosition;
   return speedE;
+}
+
+//delivering
+void delivering(char color[],int i){
+  switch(color[i]){
+    case 'R':
+    {
+      servo_1.write(200);
+    }
+    case 'G':
+    {
+      servo_1.write(200);
+    }
+    case 'B':
+    {
+      servo_1.write(200);
+    }
+  }
 }
