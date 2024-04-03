@@ -56,6 +56,7 @@ const int Plant_limit = 3;
 //motor pins
 int motor_L_pin = 11;
 int motor_R_pin = 12;
+
 //servo pins
 int servo_1_pin = 8;
 int servo_2_pin = 9;
@@ -140,23 +141,6 @@ void setup() {
 
 void loop() {
 
-  if (digitalRead(button1Pin) == LOW) {
-    addColor('G', 0, 255, 0); 
-    delay(200); 
-  } else if (digitalRead(button2Pin) == LOW) {
-    addColor('R', 255, 0, 0);
-    delay(200);
-  } else if (digitalRead(button3Pin) == LOW) {
-    addColor('B', 0, 0, 255);
-    delay(200); 
-  } else if (digitalRead(resetButtonPin) == LOW) {
-    resetColors(); 
-    delay(200); 
-  }
-
-  updateLEDStrip();
-
-
   // put your main code here, to run repeatedly:
   if (bno08x.wasReset()) {
     Serial.print("sensor was reset ");
@@ -182,7 +166,23 @@ void loop() {
       DP = 0;
       if(GS == 1) state = 1;
       else state = 0;
+      
+      if (digitalRead(button1Pin) == LOW) {
+        addColor('G', 0, 255, 0); 
+        delay(200); 
+      } else if (digitalRead(button2Pin) == LOW) {
+        addColor('R', 255, 0, 0);
+        delay(200);
+      } else if (digitalRead(button3Pin) == LOW) {
+        addColor('B', 0, 0, 255);
+        delay(200); 
+      } else if (digitalRead(resetButtonPin) == LOW) {
+        resetColors(); 
+        delay(200); 
+      }
+      updateLEDStrip();
     } break;
+    
     case 1: //Loading & Sorting
     {
       STP = 1;
