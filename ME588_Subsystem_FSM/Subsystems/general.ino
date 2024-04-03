@@ -361,6 +361,7 @@ void rotateChute(uint8_t color) {
 
 
 
+// Navigation 
 
 double getyaw(){
   double r=sensorValue.un.gameRotationVector.real;
@@ -372,7 +373,6 @@ double getyaw(){
   double yawv = atan2(siny, cosy)*180.0/M_PI;
   return yawv;
 }
-
 void drivingforward(double yawv, double ulr){
   int statedf = 0;
 
@@ -404,7 +404,6 @@ void drivingforward(double yawv, double ulr){
   ControllerR.compute();
   return;
 }
-
 void turningleft(){
   //for robustness could have 4 cases
   double init_yawv = getyaw();
@@ -420,7 +419,6 @@ void turningleft(){
   }
   
 }
-
 long speedMeasure(Encoder &Enc){//perhaps another board ?
   long oldPosition = Enc.read();
   delay(100); //need adjustment
@@ -428,8 +426,12 @@ long speedMeasure(Encoder &Enc){//perhaps another board ?
   long speedE = newPosition - oldPosition;
   return speedE;
 }
+void courseCorrection{} //based on IMU data and current ultrasonic readings
 
-//delivering
+
+
+// Delivering
+
 void delivering(char color[],int i){
   switch(color[i]){
     case 'R':
