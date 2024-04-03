@@ -2,6 +2,23 @@
 #include "ArduPID.h"
 #include <Encoder.h>
 #include <Servo.h>
+#include <SPI.h>
+
+
+
+//Button Declaration
+const int button1Pin = 2; // Button 1 (Green)
+const int button2Pin = 3; // Button 2 (Red)
+const int button3Pin = 4; // Button 3 (Blue)
+const int resetButtonPin = 5; // Reset Button
+
+//Input Color
+const int maxColors = 3;
+int colorList[3]; // Array to store colors
+int colorIndex = 0; // Index to keep track of current color
+char color[3]; 
+
+
 
 //IMU variables
 #define BNO08X_CS 7
@@ -85,6 +102,15 @@ void setup() {
   pinMode(TLP_pin, OUTPUT);
   pinMode(DP_pin, OUTPUT);
 
+  //Buttons
+  pinMode(button1Pin, INPUT);
+  pinMode(button2Pin, INPUT);
+  pinMode(button3Pin, INPUT);
+  pinMode(resetButtonPin, INPUT);
+
+
+
+
   //Driving setup
   while (!Serial) delay(10);
   bno08x.begin_I2C();
@@ -107,9 +133,30 @@ void setup() {
   servo_2.attach(servo_2_pin);
   servo_3.attach(servo_3_pin);
   
+
+  SPI.begin();
+
 }
 
 void loop() {
+
+  if (digitalRead(button1Pin) == LOW) {
+    addColor('G', 0, 255, 0); 
+    delay(200); 
+  } else if (digitalRead(button2Pin) == LOW) {
+    addColor('R', 255, 0, 0);
+    delay(200);
+  } else if (digitalRead(button3Pin) == LOW) {
+    addColor('B', 0, 0, 255);
+    delay(200); 
+  } else if (digitalRead(resetButtonPin) == LOW) {
+    resetColors(); 
+    delay(200); 
+  }
+
+  updateLEDStrip();
+
+
   // put your main code here, to run repeatedly:
   if (bno08x.wasReset()) {
     Serial.print("sensor was reset ");
@@ -218,6 +265,7 @@ void loop() {
   Serial.println(DP);
   delay(1000);
 }
+
 double getyaw(){
   double r=sensorValue.un.gameRotationVector.real;
   double i=sensorValue.un.gameRotationVector.i;
@@ -227,6 +275,35 @@ double getyaw(){
   double cosy = +1.0 - 2.0 * (j * j + k * k);  
   double yawv = atan2(siny, cosy)*180.0/M_PI;
   return yawv;
+}
+
+// Input Color Setting
+void addColor(char colorChar, byte R, byte G, byte B) {
+  if (colorIndex < maxColors) {
+    color[colorIndex] = colorChar;
+    colorList[colorIndex][0] = R;
+    colorList[colorIndex][1] = G;
+    colorList[colorIndex][2] = B;
+    colorIndex++;
+
+  }
+}
+
+void resetColors() {
+  for (int i = 0; i < maxColors; i++) {
+    colorList[i][0] = 0;
+    colorList[i][1] = 0;
+    colorList[i][2] = 0;
+  }
+  colorIndex = 0;
+}
+
+void updateLEDStrip() {
+  sendStartFrame();
+  for (int i = 0; i < maxColors; i++) {
+    sendColorFrame(0b11111111, colorList[i][2], colorList[i][1], colorList[i][0]);
+  }
+  sendEndFrame();
 }
 
 void drivingforward(double yawv, double ulr){
@@ -260,6 +337,7 @@ void drivingforward(double yawv, double ulr){
   ControllerR.compute();
   return;
 }
+
 void turningleft(){
   //for robustness could have 4 cases
   double init_yawv = getyaw();
@@ -275,6 +353,7 @@ void turningleft(){
   }
   
 }
+
 long speedMeasure(Encoder &Enc){//perhaps another board ?
   long oldPosition = Enc.read();
   delay(100); //need adjustment
