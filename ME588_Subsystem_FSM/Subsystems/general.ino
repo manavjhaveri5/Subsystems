@@ -117,11 +117,15 @@ void loop() {
   if (! bno08x.getSensorEvent(&sensorValue)) {
     return;
   }
+
+  //update this portion with sensor readings
   int GS = digitalRead(GS_pin);
   int POC = digitalRead(POC_pin);
   int TPR = digitalRead(TPR_pin);
   int PD = digitalRead(PD_pin);
   int PAC = digitalRead(PAC_pin);
+
+
   switch(state){
     case 0: //initial stand-by state
     {
@@ -150,6 +154,12 @@ void loop() {
       DFP = 1;
       TLP = 0;
       DP = 0;
+      //calling driving forward
+      double yawv = getyaw();
+      //double ulr = getulr();
+      drivingforward(yawv,ulr);
+      //Still need ultrasonic reading
+
       if(GS == 0) state = 0;
       else if(PD == 1) state = 4; //PAC=PAC+1;
       else if(TPR == 1) state = 3;
@@ -161,6 +171,9 @@ void loop() {
       DFP = 0;
       TLP = 1;
       DP = 0;
+      //calling turning left
+      turningleft();
+      TPR = 0;
       if(GS == 0) state = 0;
       else if(TPR == 1) state = 3;
       else if(PAC == 0) state = 2;
@@ -172,6 +185,8 @@ void loop() {
       DFP = 0;
       TLP = 0;
       DP = 1;
+      //calling delivering 
+      delivering(color[],i) //i is plant count
       if(GS == 0) state = 0;
       else if(PD == 1) state = 4;
       else state = 2;
