@@ -1,9 +1,14 @@
 #include <Adafruit_BNO08x.h>
+#include <Adafruit_TCS34725.h>
 #include "ArduPID.h"
 #include <Encoder.h>
 #include <Servo.h>
 #include <SPI.h>
+#include <Wire.h>
 
+
+//Color sensor
+Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
 
 //Button Declaration
@@ -18,7 +23,11 @@ int colorList[3]; // Array to store colors
 int colorIndex = 0; // Index to keep track of current color
 char color[3]; 
 
-
+// # of balls
+int countRed = 0;
+int countGreen = 0;
+int countBlue = 0;
+int totalcount = 0; 
 
 //IMU variables
 #define BNO08X_CS 7
@@ -48,6 +57,8 @@ Encoder Enc_R(5, 6);
 Servo servo_1;
 Servo servo_2;
 Servo servo_3;
+Servo servoSorting;
+
 
 //Preset threshold for general FSM
 const int Pollen_limit = 50;
@@ -61,6 +72,7 @@ int motor_R_pin = 12;
 int servo_1_pin = 8;
 int servo_2_pin = 9;
 int servo_3_pin = 10;
+const int servoSorting_pin = xx; 
 
 //pins
 int GS_pin = 2; //game start button
@@ -110,6 +122,8 @@ void setup() {
   pinMode(resetButtonPin, INPUT);
 
 
+  //Sorting setup
+  servo.attach(servoPin);
 
 
   //Driving setup
@@ -189,12 +203,22 @@ void loop() {
       DFP = 0;
       TLP = 0;
       DP = 0;
-      
-      //PAC = 0; //update plant count
+      int POC = 0;  // Plant Count
+
+      while (totalcount <100){
+        uint8_t colorDetected = detectColor();
+        totalcount = countBlue+countGreen+countRed;
+        rotateChute(colorDetected);
+        if(totalcount == 100){
+          POC = 1;
+        }
+      } 
       if(GS == 0) state = 0;
       else if(POC == 1) state = 2;
       else state = 1;
     } break;
+
+
     case 2: //Driving Forward
     {
       STP = 0;
@@ -266,18 +290,9 @@ void loop() {
   delay(1000);
 }
 
-double getyaw(){
-  double r=sensorValue.un.gameRotationVector.real;
-  double i=sensorValue.un.gameRotationVector.i;
-  double j=sensorValue.un.gameRotationVector.j;
-  double k=sensorValue.un.gameRotationVector.k;
-  double siny = +2.0 * (r * k + i * j);
-  double cosy = +1.0 - 2.0 * (j * j + k * k);  
-  double yawv = atan2(siny, cosy)*180.0/M_PI;
-  return yawv;
-}
 
 // Input Color Setting
+
 void addColor(char colorChar, byte R, byte G, byte B) {
   if (colorIndex < maxColors) {
     color[colorIndex] = colorChar;
@@ -288,7 +303,6 @@ void addColor(char colorChar, byte R, byte G, byte B) {
 
   }
 }
-
 void resetColors() {
   for (int i = 0; i < maxColors; i++) {
     colorList[i][0] = 0;
@@ -297,13 +311,66 @@ void resetColors() {
   }
   colorIndex = 0;
 }
-
 void updateLEDStrip() {
   sendStartFrame();
   for (int i = 0; i < maxColors; i++) {
     sendColorFrame(0b11111111, colorList[i][2], colorList[i][1], colorList[i][0]);
   }
   sendEndFrame();
+}
+
+// Read the color of the foam ball and Control the Chute
+
+uint8_t detectColor() {
+  uint16_t clear, red, green, blue;
+  tcs.getRawData(&red, &green, &blue, &clear);
+  
+  if (red > green && red > blue) {
+    return 1; // Red
+  } else if (green > red && green > blue) {
+    return 2; // Green
+  } else if (blue > red && blue > green) {
+    return 3; // Blue
+  }
+  return 0; // No color detected 
+}
+void rotateChute(uint8_t color) {
+  switch (color) {
+  case 1: // Red
+    servo.write(45);
+    countRed++;
+    //blinkLED(ledPinRed);
+    break;
+  case 2: // Green
+    servo.write(90);
+    countGreen++;
+    //blinkLED(ledPinGreen);
+    break;
+  case 3: // Blue
+    servo.write(135);
+    countBlue++;
+    //blinkLED(ledPinBlue);
+    break;
+  default: // In case of no color or error
+    break;
+  }
+}
+
+
+
+
+
+
+
+double getyaw(){
+  double r=sensorValue.un.gameRotationVector.real;
+  double i=sensorValue.un.gameRotationVector.i;
+  double j=sensorValue.un.gameRotationVector.j;
+  double k=sensorValue.un.gameRotationVector.k;
+  double siny = +2.0 * (r * k + i * j);
+  double cosy = +1.0 - 2.0 * (j * j + k * k);  
+  double yawv = atan2(siny, cosy)*180.0/M_PI;
+  return yawv;
 }
 
 void drivingforward(double yawv, double ulr){

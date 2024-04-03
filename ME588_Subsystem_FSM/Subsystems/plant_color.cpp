@@ -8,6 +8,7 @@ const int resetButtonPin = 5; // Reset Button
 const int maxColors = 3;
 int colorList[maxColors][3]; // Array to store colors
 int colorIndex = 0; // Index to keep track of the current color
+char color[3]; 
 
 void setup() {
   pinMode(button1Pin, INPUT_PULLUP);
@@ -20,28 +21,30 @@ void setup() {
 
 void loop() {
   if (digitalRead(button1Pin) == LOW) {
-    addColor(0, 255, 0); 
-    delay(200); // Debounce delay
+    addColor('G', 0, 255, 0); 
+    delay(200); 
   } else if (digitalRead(button2Pin) == LOW) {
-    addColor(255, 0, 0); // Add red
+    addColor('R', 255, 0, 0);
     delay(200);
   } else if (digitalRead(button3Pin) == LOW) {
-    addColor(0, 0, 255); // Add blue
+    addColor('B', 0, 0, 255);
     delay(200); 
   } else if (digitalRead(resetButtonPin) == LOW) {
-    resetColors(); // Reset colors
+    resetColors(); 
     delay(200); 
   }
 
   updateLEDStrip();
 }
 
-void addColor(byte R, byte G, byte B) {
+void addColor(char colorChar, byte R, byte G, byte B) {
   if (colorIndex < maxColors) {
+    color[colorIndex] = colorChar;
     colorList[colorIndex][0] = R;
     colorList[colorIndex][1] = G;
     colorList[colorIndex][2] = B;
     colorIndex++;
+
   }
 }
 
@@ -82,3 +85,4 @@ void sendColorFrame(byte brightness, byte B, byte G, byte R) {
   SPI.transfer(G);
   SPI.transfer(R);
 }
+
