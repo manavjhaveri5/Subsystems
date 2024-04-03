@@ -153,11 +153,11 @@ void delivering(char color[],int i){
     }
     case 'G':
     {
-      servo_1.write(200);
+      servo_2.write(200);
     }
     case 'B':
     {
-      servo_1.write(200);
+      servo_3.write(200);
     }
   }
 }
