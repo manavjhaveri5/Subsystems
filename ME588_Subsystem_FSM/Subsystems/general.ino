@@ -5,11 +5,15 @@
 #include <Servo.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <Adafruit_VL6180X>
 
 
 //Color sensor
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
+//TOF sensor
+Adafruit_VL6180X vl = Adafruit_VL6180X();
+vl.begin() // returns true if initialized
 
 //Button Declaration
 const int button1Pin = 2; // Button 1 (Green)
@@ -231,6 +235,11 @@ void loop() {
       drivingforward(yawv,ulr);
       //Still need ultrasonic reading
 
+      //TOF sensor reading
+      uint8_t status = vl.readRangeStatus() // if returns 0 there's no error
+      if (vl.readRange() <= 76.2){
+        TPR == 1;
+      }
       if(GS == 0) state = 0;
       else if(PD == 1) state = 4; //PAC=PAC+1;
       else if(TPR == 1) state = 3;
@@ -416,8 +425,7 @@ void turningleft(){
     ControllerL.compute();
     ControllerR.compute();
     yawv = getyaw();
-  }
-  
+  } 
 }
 long speedMeasure(Encoder &Enc){//perhaps another board ?
   long oldPosition = Enc.read();
