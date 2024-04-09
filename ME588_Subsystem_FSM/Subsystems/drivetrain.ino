@@ -65,6 +65,9 @@ void setup() {
   servo_1.attach(servo_1_pin);
   servo_2.attach(servo_2_pin);
   servo_3.attach(servo_3_pin);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 }
 
 void loop() {
@@ -78,7 +81,18 @@ void loop() {
   double yawv = getyaw();
   
 }
-
+long getulr(int trigPin, int echoPin){
+  long duration, distance;
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+  return distance;
+}
+}
 double getyaw(){
   double r=sensorValue.un.gameRotationVector.real;
   double i=sensorValue.un.gameRotationVector.i;
