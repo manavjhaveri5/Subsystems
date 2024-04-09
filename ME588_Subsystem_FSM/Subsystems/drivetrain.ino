@@ -92,7 +92,6 @@ long getulr(int trigPin, int echoPin){
   distance = duration * 0.034 / 2;
   return distance;
 }
-}
 double getyaw(){
   double r=sensorValue.un.gameRotationVector.real;
   double i=sensorValue.un.gameRotationVector.i;
