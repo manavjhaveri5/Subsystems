@@ -97,6 +97,7 @@ int POC = 0; //Pollen counting (how many pollen sorted)
 int TPR = 0; //Turning point reached
 int PD = 0; //Plant detected
 int PAC = 0; //Plant counting
+int LTM = 0; // Left turns made
 
 int STP = 0; //Sorting Pattern
 int DFP = 0; //Driving Forward Pattern
@@ -231,13 +232,14 @@ void loop() {
       DP = 0;
       //calling driving forward
       double yawv = getyaw();
-      //double ulr = getulr();
+      double ulr = getulr();
       drivingforward(yawv,ulr);
       //Still need ultrasonic reading
 
+
       //TOF sensor reading
-      uint8_t status = vl.readRangeStatus() // if returns 0 there's no error
-      if (vl.readRange() <= 76.2){
+      //uint8_t status = vl.readRangeStatus() // if returns 0 there's no error
+      if (ulr <= 7){
         TPR == 1;
       }
       if(GS == 0) state = 0;
@@ -253,6 +255,7 @@ void loop() {
       DP = 0;
       //calling turning left
       turningleft();
+      LTM += 1; 
       TPR = 0;
       if(GS == 0) state = 0;
       else if(TPR == 1) state = 3;
@@ -267,6 +270,7 @@ void loop() {
       DP = 1;
       //calling delivering 
       delivering(color[],i) //i is plant count
+      PAC += 1; 
       if(GS == 0) state = 0;
       else if(PD == 1) state = 4;
       else state = 2;
@@ -434,25 +438,61 @@ long speedMeasure(Encoder &Enc){//perhaps another board ?
   long speedE = newPosition - oldPosition;
   return speedE;
 }
-void courseCorrection{} //based on IMU data and current ultrasonic readings
+void courseCorrection(){
+  double desiredYaw; 
+  double yawv = getyaw(); 
+  double error = yawv - desiredYaw;  
+  double yawThreshold = 5; // 5 degrees deviation
+  int correctionFactor = 0 ;
+
+  switch (LTM % 4) {
+    case 0:
+      desiredYaw = 90;
+      break;
+    case 1:
+      desiredYaw = 180;
+      break;
+    case 2:
+      desiredYaw = 270;
+      break;
+    case 3:
+      desiredYaw = 360;
+      break;
+  }
+
+  if (error > yawThreshold) {
+    // bot veering to left, decrease the setpoint for the left motor and increase it for the right motor
+    setpoint_L += correctionFactor;
+    setpoint_R -= correctionFactor;
+  } else if (error <= -yawThreshold) {
+    // bot is veering to right, increase the setpoint for the left motor and decrease it for the right motor
+    setpoint_L -= correctionFactor;
+    setpoint_R += correctionFactor;
+  }
+
+  ControllerL.setSetpoint(setpoint_L);
+  ControllerR.setSetpoint(setpoint_R);
+}
 
 
 
 // Delivering
-
 void delivering(char color[],int i){
   switch(color[i]){
     case 'R':
     {
       servo_1.write(200);
+      break;
     }
     case 'G':
     {
       servo_2.write(200);
+      break;
     }
     case 'B':
     {
       servo_3.write(200);
+      break;
     }
   }
 }
