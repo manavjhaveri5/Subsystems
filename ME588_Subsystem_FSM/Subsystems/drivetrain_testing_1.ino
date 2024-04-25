@@ -278,10 +278,10 @@ void loop() {
         }
         bno08x.getSensorEvent(&sensorValue);
         yawv=getyaw();
-        if (LTM == 0) diff = abs(yawv-init_yawv_TL) + 2.0;
-        else if (LTM == 1) diff = abs(yawv-init_yawv_TL) + 5.0;
-        else if (LTM == 2) diff = abs(abs(yawv)-abs(init_yawv_TL))+2.0;
-        else if (LTM == 3) diff = abs(yawv-init_yawv_TL) + 2.0;
+        if (LTM == 0) diff = abs(yawv-init_yawv_TL) + 3.0;
+        else if (LTM == 1) diff = abs(yawv-init_yawv_TL) + 10.0;
+        else if (LTM == 2) diff = abs(abs(yawv)-abs(init_yawv_TL))+3.0;
+        else if (LTM == 3) diff = abs(yawv-init_yawv_TL) + 3.0;
         //Serial.println(yawv);
       }
       LTM += 1; 
