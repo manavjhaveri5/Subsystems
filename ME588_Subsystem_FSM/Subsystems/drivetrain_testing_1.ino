@@ -3,6 +3,10 @@
 #include "ArduPID.h"
 #include "interface_definition.hpp"
 #include <RunningMedian.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27,16,2);
 
 char plantcolor[4] = "RGB";
 
@@ -15,9 +19,9 @@ ArduPID ControllerL;
 ArduPID ControllerR;
 double setpoint_L = 0;
 double setpoint_R = 0;
-double p = 2;
+double p = 1.5;
 double i = 1;
-double d = 0.5;
+double d = 1;
 double motor_L_I=0;
 double motor_L_O=0;
 double motor_R_I=0;
@@ -46,7 +50,10 @@ int TPR = 0; //Turning point reached
 int PD = 0; //Plant detected
 int PAC = 0; //Plant counting
 int LTM = 0; // Left turns made
-int start_time;
+int start_time = 0;
+int last_turn = 0;
+int last_dump = 0;
+int current_time;
 
 //ultrasonic sensors
 RunningMedian ulr_F = RunningMedian(3);
@@ -63,7 +70,10 @@ void setup() {
   //Serial.println("looping");
   bno08x.begin_I2C((0x4B),&Wire1,0);
   bno08x.enableReport(SH2_GAME_ROTATION_VECTOR);
-  
+  delay(500);
+  while (! bno08x.getSensorEvent(&sensorValue)) {
+    //Serial.println("Error");
+  }
   //encoder interrupt pin definition
   attachInterrupt(digitalPinToInterrupt(RightMotorEncoderCA), EncoderCount_R, CHANGE);
   attachInterrupt(digitalPinToInterrupt(RightMotorEncoderCB), EncoderCount_R, CHANGE);
@@ -81,6 +91,9 @@ void setup() {
   ControllerR.setBias(40.0);
   ControllerR.setWindUpLimits(-10, 10); 
   ControllerR.start();
+  lcd.init();
+  lcd.backlight();
+  
 
   //delivering setup
   ServoLeftBucket.attach(PWMBucket1);
@@ -110,9 +123,10 @@ void setup() {
     ulr_F.add(ulr_F_c);
     ulr_R_2.add(ulr_R_c_2);
   }
-  //Serial.println(ulr_F.getAverage());
+  //Serial.println(ulr_F.getLowest());
   
   //
+  //start_time = millis();
   
 }
 
@@ -172,11 +186,16 @@ void loop() {
       else state = 0;
       analogWrite(MotorLeftPWM,0);
       analogWrite(MotorRightPWM,0);
+      lcd.setCursor(0, 0);
+      lcd.print("State 0");
     } break;
     
     case 1: //Loading & Sorting
     {
 //      int POC = 0;  // Plant Count
+        lcd.setCursor(0, 0);
+        lcd.print("State 1");
+
 //
 //      while (totalcount <100){
 //        uint8_t colorDetected = detectColor();
@@ -195,6 +214,8 @@ void loop() {
 
     case 2: //Driving Forward
     {
+      lcd.setCursor(0, 0);
+      lcd.print("State 2");
       yawv = getyaw();
       Serial.print("z axis rotation:");
       Serial.println(yawv);
@@ -208,45 +229,63 @@ void loop() {
       //Serial.println(ulr_R_c);
       double frontDis = ulr_F.getAverage();
       //Serial.println(frontDis);
-      if (frontDis <= 6.5){
+      current_time = millis();
+      if ((frontDis <= 6.5) && (current_time-last_turn>1000)){
         TPR = 1;
+        Serial.print("Turning point: ");
+        Serial.println(frontDis);
       }
-      if (((ulr_R_c_2-ulr_R_2.getAverage()) >= 5)&&(ulr_R_c_2<20)){//&&(ulr_R_c<90)
+      //lcd.setCursor(0, 0);
+      Serial.print("Ultrasonic middle reading diff: ");
+      Serial.println(ulr_R_c_2-ulr_R_2.getLowest());
+      Serial.print("Current middle reading: ");
+      Serial.println(ulr_R_c_2);
+      Serial.print("Front reading: ");
+      Serial.println(ulr_R_c);
+      if (((ulr_R_c_2-ulr_R_2.getLowest()) >= 5)&&(ulr_R_c_2<30)){//&&(ulr_R_c<90)
         //delay(50);
         //ulr_R_c = getulr(TrigRight,EchoRight);
-        if (((ulr_R.getAverage()) >= 10)&&(ulr_R_c<20)){
+        if (((ulr_R_c) >= 10)&&(ulr_R_c<30)){
           PD = 1;
         }
       }
       
       if(GS == 0) state = 0;
-      else if(PD == 1) {
-        drivingforward(yawv,ulr_R.getAverage(),LTM);
+      else if((PD == 1)&& (current_time-last_dump>5000)) {
+        drivingforward(yawv,ulr_R.getLowest(),LTM);
         delay(500);
         state = 4;//PAC=PAC+1;
       }
       else if(TPR == 1) state = 3;
       else {
-        drivingforward(yawv,ulr_R.getAverage(),LTM);
+        drivingforward(yawv,ulr_R.getLowest(),LTM);
         state = 2;
       }
     } break;
     case 3: //Turning Left
     {
       //calling turning left
+      lcd.setCursor(0, 0);
+      lcd.print("State 3:");
       double init_yawv_TL = getyaw();
+      double diff = 0;
       yawv = getyaw();
       //Serial.println("Left");
-      while(abs(yawv-init_yawv_TL)<90){
+      while(diff<90){
         turningleft();
         while (! bno08x.getSensorEvent(&sensorValue)) {
          //Serial.println("Error");
         }
         bno08x.getSensorEvent(&sensorValue);
         yawv=getyaw();
+        if (LTM == 0) diff = abs(yawv-init_yawv_TL) + 2.0;
+        else if (LTM == 1) diff = abs(yawv-init_yawv_TL) + 5.0;
+        else if (LTM == 2) diff = abs(abs(yawv)-abs(init_yawv_TL))+2.0;
+        else if (LTM == 3) diff = abs(yawv-init_yawv_TL) + 2.0;
         //Serial.println(yawv);
       }
       LTM += 1; 
+      last_turn = millis();
       Serial.println("LTM: ");
       Serial.println(LTM);
       TPR = 0;
@@ -256,26 +295,21 @@ void loop() {
       else state = 1;
       analogWrite(MotorLeftPWM,0);
       analogWrite(MotorRightPWM,0);
-      delay(100);
-      for (int k = 1; k<4; k++){
-        double ulr_F_c = getulr(TrigFront,EchoFront);
-        double ulr_R_c = getulr(TrigRight,EchoRight);
-        double ulr_R_c_2 = getulr(TrigRight2,EchoRight2);
-        ulr_F.add(ulr_F_c);
-        ulr_R.add(ulr_R_c);
-        ulr_R_2.add(ulr_R_c_2);
-      }
+      delay(200);
     } break;
     case 4: //Delivering
     {
-//      //calling delivering 
+//      //calling delivering
+      lcd.setCursor(0, 0);
+      lcd.print("State 4:");
       analogWrite(MotorLeftPWM,0);
       analogWrite(MotorRightPWM,0);
-      //delivering(plantcolor,PAC); //i is plant count
+      last_dump = millis();
+      delivering(plantcolor,PAC); //i is plant count
       PD = 0;
       PAC += 1;
-      delay(5000);
-      for (int k = 1; k<15; k++){
+      //delay(5000);
+      for (int k = 1; k<10; k++){
         double ulr_F_c = getulr(TrigFront,EchoFront);
         double ulr_R_c = getulr(TrigRight,EchoRight);
         double ulr_R_c_2 = getulr(TrigRight2,EchoRight2);
@@ -283,14 +317,15 @@ void loop() {
         ulr_F.add(ulr_F_c);
         ulr_R_2.add(ulr_R_c_2);
       }
-      //drivingforward(0,ulr_R.getAverage(),LTM);
+      //drivingforward(0,ulr_R.getLowest(),LTM);
       //delay(200);
       if(GS == 0) state = 0;
       //else if(PD == 1) state = 4;
       else state = 2;
     } break;
   }
-
+  Serial.print("State: ");
+  Serial.println(state);
 }
 double getulr(int trigPin, int echoPin){
   double duration, distance;
@@ -315,17 +350,17 @@ double getyaw(){
   return yawv;
 }
 
-void drivingforward(double yawv, double ulr, int LTM_DF){
+void drivingforward(double yawv_DF, double ulr, int LTM_DF){
   int statedf = 0;
-  if (LTM_DF == 1) yawv = yawv - 90;
-  else if (LTM_DF == 2) yawv = (abs(yawv) - 180)*(abs(yawv)/yawv);
-  else if (LTM_DF == 3) yawv = -(abs(yawv) - 90);
+  if (LTM_DF == 1) yawv_DF = yawv_DF - 90;
+  else if (LTM_DF == 2) yawv_DF = (abs(yawv_DF) - 180)*(abs(yawv_DF)/yawv_DF);
+  else if (LTM_DF == 3) yawv_DF = -(abs(yawv_DF) - 90);
   Serial.print("Corrected yawv: ");
-  Serial.println(yawv);
-  //if(ulr>=5.0) statedf = 1; //ultrasonic reading >= 7inches
+  Serial.println(yawv_DF);
+  if((ulr>=5.5)&&(ulr<=10.0)) statedf = 1; //ultrasonic reading >= 7inches
   //else if(ulr<=4.0) statedf = 2;
-  if(yawv>=3.0) statedf = 1;
-  else if (yawv<=-3.0) statedf = 2;
+  else if(yawv_DF>=3.0) statedf = 1;
+  else if (yawv_DF<=-3.0) statedf = 2;
   else statedf=0;
   switch(statedf) {
     case 0:
@@ -336,11 +371,11 @@ void drivingforward(double yawv, double ulr, int LTM_DF){
     case 1: //towards right
     {
       setpoint_L = 60;
-      setpoint_R = 30;
+      setpoint_R = 40;
     }break;
     case 2: //towards left
     {
-      setpoint_L = 30;
+      setpoint_L = 40;
       setpoint_R = 60;
     }break;
   }
@@ -360,8 +395,8 @@ void drivingforward(double yawv, double ulr, int LTM_DF){
 void turningleft(){
   //Serial.println(yawv_TL);
   //for robustness could have 4 cases
-    setpoint_L = 35;
-    setpoint_R = 35;
+    setpoint_L = 40;
+    setpoint_R = 40;
     motor_L_I = speedMeasure("L")*40.0/444.0;
     motor_R_I = speedMeasure("R")*40.0/444.0;
     ControllerL.compute();
@@ -420,6 +455,16 @@ void delivering(char color[],int i){
   switch(color[i]){
     case 'R': 
     {
+      analogWrite(MotorLeftPWM,40);
+      analogWrite(MotorRightPWM,40);
+      digitalWrite(MotorLeftInput1,HIGH);
+      digitalWrite(MotorRightInput1,HIGH);
+      digitalWrite(MotorLeftInput2,LOW);
+      digitalWrite(MotorRightInput2,LOW);
+      delay(300);
+      analogWrite(MotorLeftPWM,0);
+      analogWrite(MotorRightPWM,0);
+      
       drivingforward(yawv, 0, LTM);
       delay(100);
       analogWrite(MotorLeftPWM,0);
@@ -440,16 +485,16 @@ void delivering(char color[],int i){
     case 'B': 
     {
       int lift_sort_UD = 140;
-      while(lift_sort_UD>40){
+      while(lift_sort_UD>50){
         ServoSortUD.write(i);
-        delay(20);
+        delay(30);
         lift_sort_UD=lift_sort_UD-1;
       }
-      int lift_sort_LR = 67;
-      while(lift_sort_LR<170){
+      int lift_sort_LR = 117;
+      while(lift_sort_LR>50){
         ServoSortLR.write(i);
-        delay(20);
-        lift_sort_LR=lift_sort_LR+1;
+        delay(30);
+        lift_sort_LR=lift_sort_LR-1;
       }
       int lift = 29;
       while(lift<100){//161
@@ -462,23 +507,37 @@ void delivering(char color[],int i){
         ServoMidBucket.write(lift);
         delay(20);
         lift=lift-1;
-      } 
-      lift_sort_LR = 170;
-      while(lift_sort_LR>67){
-        ServoSortLR.write(i);
-        delay(20);
-        lift_sort_LR=lift_sort_LR-1;
       }
-      lift_sort_UD = 40;
+      delay(500); 
+      lift_sort_LR = 50;
+      while(lift_sort_LR<117){
+        ServoSortLR.write(i);
+        delay(30);
+        lift_sort_LR=lift_sort_LR+1;
+      }
+      lift_sort_UD = 50;
       while(lift_sort_UD<140){
         ServoSortUD.write(i);
-        delay(20);
+        delay(30);
         lift_sort_UD=lift_sort_UD+1;
       }
       
     }break;
     case 'G':
     {
+      analogWrite(MotorLeftPWM,60);
+      analogWrite(MotorRightPWM,60);
+      digitalWrite(MotorLeftInput1,LOW);
+      digitalWrite(MotorRightInput1,LOW);
+      digitalWrite(MotorLeftInput2,HIGH);
+      digitalWrite(MotorRightInput2,HIGH);
+      delay(1600);
+      analogWrite(MotorLeftPWM,0);
+      analogWrite(MotorRightPWM,0);
+      digitalWrite(MotorLeftInput1,HIGH);
+      digitalWrite(MotorRightInput1,HIGH);
+      digitalWrite(MotorLeftInput2,LOW);
+      digitalWrite(MotorRightInput2,LOW);
       int lift = 176;
       while(lift>100){//44
         ServoLeftBucket.write(lift);
